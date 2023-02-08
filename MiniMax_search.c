@@ -24,6 +24,65 @@
 */
 
 #include "MiniMax_search.h"
+#include "float.h"
+
+typedef struct Node{
+	Node* next;
+	double score;
+}Node;
+
+Node* newNode(double score){
+	Node* new = calloc(1,sizeof(Node));
+	if(new == NULL){
+		return new;
+	}
+	new->score = score;
+	new->next = NULL;
+	return new;
+}
+
+void prepend(Node* node, Node* list){
+	node->next = list;
+}
+
+double maxList(Node* start){
+	Node* curr = start;
+	double max = -DBL_MAX;
+	while(curr != NULL){
+		if (curr->score > max){
+			max = curr->score;
+		}
+		curr = curr->next;
+	}
+	return max;
+}
+
+double minList(Node* start){
+	Node* curr = start;
+	double min = DBL_MAX;
+	while(curr != NULL){
+		if(curr->score < min){
+			min = curr->score;
+		}
+		curr = curr->next;
+	}
+	return min;
+}
+
+void freeList(Node* start){
+	Node* curr = start;
+	Node* prev = start;
+	while(curr != NULL){
+		curr = curr->next;
+		free(prev);
+		prev = curr;
+	}
+	return;
+}
+
+int get_grid_position(int coords[2]){
+	return (coords[0] + (size_X * coords[1]));
+}
 
 double MiniMax(double gr[graph_size][4], int path[1][2], double minmax_cost[size_X][size_Y], int cat_loc[10][2], int cats, int cheese_loc[10][2], int cheeses, int mouse_loc[1][2], int mode, double (*utility)(int cat_loc[10][2], int cheese_loc[10][2], int mouse_loc[1][2], int cats, int cheeses, int depth, double gr[graph_size][4]), int agentId, int depth, int maxDepth, double alpha, double beta)
 {
@@ -154,6 +213,48 @@ double MiniMax(double gr[graph_size][4], int path[1][2], double minmax_cost[size
  ********************************************************************************************************/
 
  // Stub so that the code compiles/runs - This will be removed and replaced by your code!
+	if(depth >= maxDepth){
+		//once reach max depth, return a minimax value for current max depth
+		return utility(cat_loc,cheese_loc,mouse_loc,cats,cheeses,depth,gr); 
+	}
+	//if not at max depth
+	//then figure out if we're doining min (agent = cat = 1) or max (agent = mouse = 0)
+
+	//TODO: STILL NEED TO UPDATE PATHS, PROPERLY
+	Node* scores = NULL;
+	if (gr[get_grid_position(mouse_loc[0])][0] == 1){
+		mouse_loc[0][1] = mouse_loc[0][1] - 1;
+		double up_score = MiniMax(gr,path,minmax_cost,mouse_loc,cats,cheese_loc,cheeses,mouse_loc,mode,utility,!agentId,depth+1,maxDepth,alpha,beta);
+		mouse_loc[0][1] = mouse_loc[0][1] + 1;
+		prepend(newNode(up_score),scores);
+	}
+	if(gr[get_grid_position(mouse_loc[0])][1] == 1){
+		mouse_loc[0][0] = mouse_loc[0][0] + 1;
+		double right_score = MiniMax(gr,path,minmax_cost,mouse_loc,cats,cheese_loc,cheeses,mouse_loc,mode,utility,!agentId,depth+1,maxDepth,alpha,beta);
+		mouse_loc[0][0] = mouse_loc[0][0] - 1;
+		prepend(newNode(right_score),scores);
+	}
+	if(gr[get_grid_position(mouse_loc[0])][2] == 1){
+		mouse_loc[0][1] = mouse_loc[0][1] + 1;
+		double down_score = MiniMax(gr,path,minmax_cost,mouse_loc,cats,cheese_loc,cheeses,mouse_loc,mode,utility,!agentId,depth+1,maxDepth,alpha,beta);
+		mouse_loc[0][1] = mouse_loc[0][1] - 1;
+		prepend(newNode(down_score),scores);
+	}
+	if(gr[get_grid_position(mouse_loc[0])][3] == 1){
+		mouse_loc[0][0] = mouse_loc[0][0] - 1;
+		double left_score = MiniMax(gr,path,minmax_cost,mouse_loc,cats,cheese_loc,cheeses,mouse_loc,mode,utility,!agentId,depth+1,maxDepth,alpha,beta);
+		mouse_loc[0][0] = mouse_loc[0][0] + 1;
+		prepend(newNode(left_score),scores);
+	}
+	double score;
+	if(agentId == 0){
+		//if mouse maximize utilities
+		score = maxList(scores);
+	}else{
+		score = minList(scores);
+	}
+	freeList(scores);
+	return score;
 
  path[0][0]=mouse_loc[0][0];
  path[0][1]=mouse_loc[0][1];
