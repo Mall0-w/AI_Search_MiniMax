@@ -25,44 +25,48 @@
 
 #include "MiniMax_search.h"
 #include "float.h"
+#include "limits.h"
 
 typedef struct Node{
 	Node* next;
 	double score;
+	int origin;
 }Node;
 
-Node* newNode(double score){
-	Node* new = calloc(1,sizeof(Node));
-	if(new == NULL){
-		return new;
+Node* newNode(double score, int origin){
+	Node* newN = (Node*) calloc(1,sizeof(Node));
+	if(newN == NULL){
+		return NULL;
 	}
-	new->score = score;
-	new->next = NULL;
-	return new;
+	newN->score = score;
+	newN->origin = origin;
+	newN->next = NULL;
+	return newN;
 }
 
-void prepend(Node* node, Node* list){
+Node* prepend(Node* node, Node* list){
 	node->next = list;
+	return node;
 }
 
-double maxList(Node* start){
+Node* maxList(Node* start){
 	Node* curr = start;
-	double max = -DBL_MAX;
+	Node* max = NULL;
 	while(curr != NULL){
-		if (curr->score > max){
-			max = curr->score;
+		if (max == NULL || curr->score > max->score){
+			max = curr;
 		}
 		curr = curr->next;
 	}
 	return max;
 }
 
-double minList(Node* start){
+Node* minList(Node* start){
 	Node* curr = start;
-	double min = DBL_MAX;
+	Node* min = NULL;
 	while(curr != NULL){
-		if(curr->score < min){
-			min = curr->score;
+		if(min == NULL || curr->score < min->score){
+			min = curr;
 		}
 		curr = curr->next;
 	}
@@ -82,6 +86,44 @@ void freeList(Node* start){
 
 int get_grid_position(int coords[2]){
 	return (coords[0] + (size_X * coords[1]));
+}
+
+Node* permute_kitties(double gr[graph_size][4], int path[1][2], double minmax_cost[size_X][size_Y], int cat_loc[10][2], int cats, int cheese_loc[10][2], int cheeses, int mouse_loc[1][2], int mode, double (*utility)(int cat_loc[10][2], int cheese_loc[10][2], int mouse_loc[1][2], int cats, int cheeses, int depth, double gr[graph_size][4]), int agentId, int depth, int maxDepth, double alpha, double beta,
+	int index, Node* scores){
+	if(index == cats){
+		//if reached end of array then we've achieved a permutation
+		//run minimax and save that score
+		double newScore = MiniMax(gr,path,minmax_cost,cat_loc,cats,cheese_loc,cheeses,mouse_loc,mode,utility,!agentId,depth+1,maxDepth,alpha,beta);
+		//don't update minimax or anything yet because we have not moved the mouse
+		//just append new score and return
+		return prepend(newNode(newScore,get_grid_position(mouse_loc[0])),scores);
+	}
+	//otherwise we're still permuting
+	//for each index in the array iterate through its possible values then permute the next ones
+	for(int i = 0; i < 4; i++){
+		int y_offset =  (1-(i%2)) * (-1+i);
+		int x_offset = ((i%2) * (2 - i));
+
+		if(gr[get_grid_position(cat_loc[index])][i] == 1
+		&& cat_loc[index][0] + x_offset >= 0 && cat_loc[index][0] + x_offset < size_X
+		&& cat_loc[index][1] + y_offset >= 0 && cat_loc[index][1] + y_offset < size_Y){
+			
+			//temporarily change the locations
+			cat_loc[index][0] += x_offset;
+			cat_loc[index][1] += y_offset;
+
+			//permute the next kitty
+			scores = permute_kitties(gr,path,minmax_cost,cat_loc,cats,cheese_loc,cheeses,mouse_loc,mode,utility,agentId,depth,maxDepth,
+			alpha,beta,index+1,scores);
+
+			//snap back to reality
+			cat_loc[index][0] -= x_offset;
+			cat_loc[index][1] -= y_offset;
+			
+		}
+		//note if path not possible, we don't want to permute further anyways so can just skip
+	}
+	return scores;
 }
 
 double MiniMax(double gr[graph_size][4], int path[1][2], double minmax_cost[size_X][size_Y], int cat_loc[10][2], int cats, int cheese_loc[10][2], int cheeses, int mouse_loc[1][2], int mode, double (*utility)(int cat_loc[10][2], int cheese_loc[10][2], int mouse_loc[1][2], int cats, int cheeses, int depth, double gr[graph_size][4]), int agentId, int depth, int maxDepth, double alpha, double beta)
@@ -213,53 +255,96 @@ double MiniMax(double gr[graph_size][4], int path[1][2], double minmax_cost[size
  ********************************************************************************************************/
 
  // Stub so that the code compiles/runs - This will be removed and replaced by your code!
-	if(depth >= maxDepth){
+	if(depth >= maxDepth || checkForTerminal(mouse_loc,cat_loc,cheese_loc,cats,cheeses)){
 		//once reach max depth, return a minimax value for current max depth
-		return utility(cat_loc,cheese_loc,mouse_loc,cats,cheeses,depth,gr); 
+		if(checkForTerminal(mouse_loc,cat_loc,cheese_loc,cats,cheeses)){
+			printf("Terminal found!\n");
+		}
+		double cost = utility(cat_loc,cheese_loc,mouse_loc,cats,cheeses,depth,gr);
+		minmax_cost[mouse_loc[0][0]][mouse_loc[0][1]] = cost;
+		return cost; 
 	}
 	//if not at max depth
 	//then figure out if we're doining min (agent = cat = 1) or max (agent = mouse = 0)
 
 	//TODO: STILL NEED TO UPDATE PATHS, PROPERLY
+	//TODO: EXPAND THE TREE (for each of the possible moves of the mouse)
+	//TODO: MOVE IT AND THEN RUN FOR ALL MOVES OF THE CATS (all children is seeing what direction a cat moves and what direction a mouse moves)
+
+
 	Node* scores = NULL;
-	if (gr[get_grid_position(mouse_loc[0])][0] == 1){
-		mouse_loc[0][1] = mouse_loc[0][1] - 1;
-		double up_score = MiniMax(gr,path,minmax_cost,mouse_loc,cats,cheese_loc,cheeses,mouse_loc,mode,utility,!agentId,depth+1,maxDepth,alpha,beta);
-		mouse_loc[0][1] = mouse_loc[0][1] + 1;
-		prepend(newNode(up_score),scores);
+	
+	//every child of the tree will be a combination of mouse/cat moves
+
+	//permute every possible move from this level (for each of the mouse's directions, for each of the cat's directions)
+
+	//if agent = 0 then mouse is moving, permute all possible children for the mouse
+	if(agentId == 0){
+		//permute all options for a mouse
+		for(int i = 0; i < 4; i++){
+			//if even will be moving up/down so y should be active
+
+			//didn't want to do a bunch of iff statements like with A1 so devised this:
+			//if 0 -1, if 2 +1 so it should be (1-(i%2)) * (-1+i) will be 1 * (-1 or 1) if even
+			//odd will be 1 or 3 so it should be (i%2) * (-2 + i)
+			int y_offset =  (1-(i%2)) * (-1+i);
+			int x_offset = ((i%2) * (2 - i));
+
+			if(gr[get_grid_position(mouse_loc[0])][i] == 1
+			&& mouse_loc[0][0] + x_offset >= 0 && mouse_loc[0][0] + x_offset < size_X
+			&& mouse_loc[0][1] + y_offset >= 0 && mouse_loc[0][1] + y_offset < size_Y){
+				//if new position is valid
+				
+				//update positions and continue minimax with them
+				mouse_loc[0][0] += x_offset;
+				mouse_loc[0][1] += y_offset;
+				//go through minimax to get cost for cats at lower depth
+				double newCost = MiniMax(gr,path,minmax_cost,cat_loc,cats,cheese_loc,
+				cheeses,mouse_loc,mode,utility,!agentId,depth+1,maxDepth,alpha,beta);
+				//update minimax and scores
+				minmax_cost[mouse_loc[0][0]][mouse_loc[0][1]] = newCost;
+				scores = prepend(newNode(newCost,get_grid_position(mouse_loc[0])),scores);
+				//return to normality
+				mouse_loc[0][0] -= x_offset;
+				mouse_loc[0][1] -= y_offset;
+			}
+		}
+	}else{
+		//permute all options for that cat (tricky since undefined number of cats)
+		scores = permute_kitties(gr,path,minmax_cost,cat_loc,cats,cheese_loc,cheeses,mouse_loc,mode,
+		utility,agentId,depth,maxDepth,alpha,beta,0,scores);
 	}
-	if(gr[get_grid_position(mouse_loc[0])][1] == 1){
-		mouse_loc[0][0] = mouse_loc[0][0] + 1;
-		double right_score = MiniMax(gr,path,minmax_cost,mouse_loc,cats,cheese_loc,cheeses,mouse_loc,mode,utility,!agentId,depth+1,maxDepth,alpha,beta);
-		mouse_loc[0][0] = mouse_loc[0][0] - 1;
-		prepend(newNode(right_score),scores);
-	}
-	if(gr[get_grid_position(mouse_loc[0])][2] == 1){
-		mouse_loc[0][1] = mouse_loc[0][1] + 1;
-		double down_score = MiniMax(gr,path,minmax_cost,mouse_loc,cats,cheese_loc,cheeses,mouse_loc,mode,utility,!agentId,depth+1,maxDepth,alpha,beta);
-		mouse_loc[0][1] = mouse_loc[0][1] - 1;
-		prepend(newNode(down_score),scores);
-	}
-	if(gr[get_grid_position(mouse_loc[0])][3] == 1){
-		mouse_loc[0][0] = mouse_loc[0][0] - 1;
-		double left_score = MiniMax(gr,path,minmax_cost,mouse_loc,cats,cheese_loc,cheeses,mouse_loc,mode,utility,!agentId,depth+1,maxDepth,alpha,beta);
-		mouse_loc[0][0] = mouse_loc[0][0] + 1;
-		prepend(newNode(left_score),scores);
-	}
-	double score;
+
+	//get best option from available scores list
+	Node* option;
 	if(agentId == 0){
 		//if mouse maximize utilities
-		score = maxList(scores);
+		option = maxList(scores);
 	}else{
-		score = minList(scores);
+		option = minList(scores);
 	}
 	freeList(scores);
-	return score;
+	//if there was no found min or max, return worst posible value and have mouse remain still
+	if(option == NULL){
+		if(agentId == 0){
+			path[0][0]=mouse_loc[0][0];
+ 			path[0][1]=mouse_loc[0][1];
+			minmax_cost[mouse_loc[0][0]][mouse_loc[0][1]] = -DBL_MAX;
+			return -DBL_MAX;
+		}
+		minmax_cost[mouse_loc[0][0]][mouse_loc[0][1]] = DBL_MAX;
+		return DBL_MAX;
+	}
+	//printf("Not null %d\n", option->origin);
+	//update path for best node and return its score
+	if(agentId == 0){
+		path[0][0] = option->origin % size_X;
+		path[0][1] = option->origin / size_Y;
+	}
+	//update minimax score
+	minmax_cost[mouse_loc[0][0]][mouse_loc[0][1]] = option->score;
 
- path[0][0]=mouse_loc[0][0];
- path[0][1]=mouse_loc[0][1];
-
- return(0.0);
+	return option->score;
 }
 
 double utility(int cat_loc[10][2], int cheese_loc[10][2], int mouse_loc[1][2], int cats, int cheeses, int depth, double gr[graph_size][4])
@@ -291,7 +376,17 @@ double utility(int cat_loc[10][2], int cheese_loc[10][2], int mouse_loc[1][2], i
 	//low num cats is optimal because that means less cats to chase mouse and no cats means that mouse has won
 	//want high proximity between mouse and cheese, low proximity between (mouse and cat) and (cat and cheese)
 
- return(1);   // <--- Obviously, this will be replaced by your computer utilities
+	//for now just computing manhattan dist to closest cheese
+	int min_dist = INT_MAX;
+	for(int i = 0; i < cheeses; i++){
+		int newDist = abs(mouse_loc[0][0] - cheese_loc[i][0]) + abs(mouse_loc[0][1] - cheese_loc[i][1]);
+		if(newDist < min_dist){
+			min_dist = newDist;
+		}
+	}
+	return (size_X + size_Y) - min_dist;
+
+ 	//return(1);   // <--- Obviously, this will be replaced by your computer utilities
 }
 
 int checkForTerminal(int mouse_loc[1][2],int cat_loc[10][2],int cheese_loc[10][2],int cats,int cheeses)
