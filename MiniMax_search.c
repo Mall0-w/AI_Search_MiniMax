@@ -61,6 +61,10 @@ Node* maxList(Node* start){
 	return max;
 }
 
+Node* createPriorityNode(int origin, double score){
+	return newNode(score, origin);
+}
+
 Node* minList(Node* start){
 	Node* curr = start;
 	Node* min = NULL;
@@ -81,11 +85,99 @@ void freeList(Node* start){
 		free(prev);
 		prev = curr;
 	}
+	if(prev != NULL){
+		free(prev);
+	}
+	return;
+}
+
+typedef struct Queue{
+	Node* first;
+	Node* last;
+} Queue;
+
+Queue* createQueue(){
+	Queue* newQueue = (Queue*)calloc(1, sizeof(Queue));
+	if(newQueue == NULL){
+		// printf("Not enough memory for queue");
+		return NULL;
+	}
+	newQueue->first = NULL;
+	newQueue->last = NULL;
+
+	return newQueue;
+}
+
+//enqueue into priority queue by sorting each time something is inserted into the queue
+//slow but i didn't want to implement something like a min heap
+void priorityEnQueue(Queue* queue, int value, int priority){
+	Node* newNode = createPriorityNode(value, priority);
+	if(queue->first == NULL){
+		queue->first = newNode;
+		queue->last = newNode;
+		return;
+	}
+	//otherwise insert into linked list and sort it
+
+	if(newNode->score <= queue->first->score){
+		newNode->next = queue->first;
+		queue->first = newNode;
+		return;
+	}
+
+	Node* head = queue->first;
+	//note prev should never be null since we always check to see if it should be inserted
+	//at head first
+	Node* prev = NULL;
+	while(head != NULL){
+		if(newNode->score <= head->score){
+			prev->next = newNode;
+			newNode->next = head;
+			return;
+		}
+		prev = head;
+		head = head->next;
+	}
+	//if iterated through entire list then it is the new last element
+	prev->next = newNode;
+	queue->last = newNode;
+	return;
+}
+
+int deQueue(Queue* queue){
+	if(queue->first == NULL){
+		// printf("Nothing in queue");
+		return -1;
+	}
+	Node* first = queue->first;
+	queue->first = queue->first->next;
+	if(queue->first == NULL){
+		queue->last = NULL;
+	}
+	int val = first->origin;
+	free(first);
+	return val;
+}
+
+void freeQueue(Queue* queue){
+	Node* first = queue->first;
+	Node* temp = NULL;
+	while(first != NULL){
+		temp = first->next;
+		free(first);
+		first = temp;
+	}
+	queue->last = NULL;
+	free(queue);
 	return;
 }
 
 int get_grid_position(int coords[2]){
 	return (coords[0] + (size_X * coords[1]));
+}
+
+int manhattan_dist(int point1[2], int point2[2]){
+	return abs(point1[0] - point2[0]) + abs(point1[1] - point2[1]);
 }
 
 Node* permute_kitties(double gr[graph_size][4], int path[1][2], double minmax_cost[size_X][size_Y], int cat_loc[10][2], int cats, int cheese_loc[10][2], int cheeses, int mouse_loc[1][2], int mode, double (*utility)(int cat_loc[10][2], int cheese_loc[10][2], int mouse_loc[1][2], int cats, int cheeses, int depth, double gr[graph_size][4]), int agentId, int depth, int maxDepth, double alpha, double beta,
@@ -257,11 +349,9 @@ double MiniMax(double gr[graph_size][4], int path[1][2], double minmax_cost[size
  // Stub so that the code compiles/runs - This will be removed and replaced by your code!
 	if(depth >= maxDepth || checkForTerminal(mouse_loc,cat_loc,cheese_loc,cats,cheeses)){
 		//once reach max depth, return a minimax value for current max depth
-		if(checkForTerminal(mouse_loc,cat_loc,cheese_loc,cats,cheeses)){
-			printf("Terminal found!\n");
-		}
 		double cost = utility(cat_loc,cheese_loc,mouse_loc,cats,cheeses,depth,gr);
 		minmax_cost[mouse_loc[0][0]][mouse_loc[0][1]] = cost;
+		//printf("depth %d, cost %lf, mode %d\n",depth,cost,agentId);
 		return cost; 
 	}
 	//if not at max depth
@@ -323,9 +413,9 @@ double MiniMax(double gr[graph_size][4], int path[1][2], double minmax_cost[size
 	}else{
 		option = minList(scores);
 	}
-	freeList(scores);
 	//if there was no found min or max, return worst posible value and have mouse remain still
 	if(option == NULL){
+		freeList(scores);
 		if(agentId == 0){
 			path[0][0]=mouse_loc[0][0];
  			path[0][1]=mouse_loc[0][1];
@@ -335,16 +425,154 @@ double MiniMax(double gr[graph_size][4], int path[1][2], double minmax_cost[size
 		minmax_cost[mouse_loc[0][0]][mouse_loc[0][1]] = DBL_MAX;
 		return DBL_MAX;
 	}
+	int origin = option->origin;
+	double score = option->score;
+	freeList(scores);
 	//printf("Not null %d\n", option->origin);
 	//update path for best node and return its score
 	if(agentId == 0){
-		path[0][0] = option->origin % size_X;
-		path[0][1] = option->origin / size_Y;
+		path[0][0] = origin % size_X;
+		path[0][1] = origin / size_Y;
 	}
 	//update minimax score
-	minmax_cost[mouse_loc[0][0]][mouse_loc[0][1]] = option->score;
+	minmax_cost[mouse_loc[0][0]][mouse_loc[0][1]] = score;
+	//printf("depth %d, cost %lf, mode %d \n",depth,option->score,agentId);
+	return score;
+}
 
-	return option->score;
+//Helper function used to determine if a pair of coordinates are in an array
+//if they are in array, return its index, otherwise return -1
+int coordsInArray(int coords ,int (*array)[2],int size){
+	for(int i = 0; i < size; i++){
+		if (coords == get_grid_position(*(array+i))){
+			return i;
+		}
+	}
+	return -1;
+}
+
+double heuristic(int x, int y, int cat_loc[10][2], int cheese_loc[10][2], int mouse_loc[1][2], int cats, int cheeses, double gr[graph_size][4])
+{
+ /*
+	This function computes and returns the heuristic cost for location x,y.
+	As discussed in lecture, this means estimating the cost of getting from x,y to the goal. 
+	The goal is cheese. Which cheese is up to you.
+	Whatever you code here, your heuristic must be admissible.
+
+	Input arguments:
+
+		x,y - Location for which this function will compute a heuristic search cost
+		cat_loc - Cat locations
+		cheese_loc - Cheese locations
+		mouse_loc - Mouse location
+		cats - # of cats
+		cheeses - # of cheeses
+		gr - The graph's adjacency list for the maze
+
+		These arguments are as described in the search() function above
+ */
+
+	/**
+	 * have each cost be manhattan distance to closest cheese (can figure out better algo later)
+	*/
+	int min_distance = INT_MAX;
+	for(int i = 0; i < cheeses; i++){
+		int new_dist = (abs(x - cheese_loc[i][0]) + abs(y - cheese_loc[i][1]));
+		if (new_dist < min_distance){
+			min_distance = new_dist;
+		}
+	}
+	return min_distance;
+}
+
+int search_length(double gr[graph_size][4], int cat_loc[10][2], int cats, int cheese_loc[10][2], int cheeses, int mouse_loc[1][2]){
+
+	//initalize priority queue
+	//add starting node to priority queue
+	Queue* priorityQueue = createQueue();
+	int mouse_grid = get_grid_position(mouse_loc[0]);
+	priorityEnQueue(priorityQueue,mouse_grid,1);
+
+	int cheese_index = -1;
+	int iteration = 0;
+
+	int predecessor[graph_size];
+	int distances[graph_size] = {0};
+
+	//initalizing the predecessor arr
+	for(int i = 0; i < graph_size; i++){
+		predecessor[i] = -1;
+	}
+
+	//while priority queue has an entry
+	while(priorityQueue->first != NULL){
+
+		//pop off from priority queue
+		int curr_pos = deQueue(priorityQueue);
+		// printf("dequeued %d\n",curr_pos);
+		int curr_x = curr_pos % size_X;
+		int curr_y = curr_pos / size_Y;
+		//if its a cheese then you've found the cheese
+		cheese_index = coordsInArray(curr_pos,cheese_loc,cheeses);
+		if(cheese_index >= 0){
+			// printf("cheese has been found!\n");
+			break;
+		}
+
+		
+		//otherwise see if other nodes are valid and put them in the priority queue based off their heuristic
+
+		if(gr[curr_pos][0] == 1 && coordsInArray(curr_pos-size_X,cat_loc,cats) < 0 && curr_pos - size_X >= 0 && predecessor[curr_pos-size_X] == -1){
+			int new_pos = curr_pos-size_X;
+			distances[new_pos] = distances[curr_pos] + 1;
+			predecessor[new_pos] = curr_pos;
+			priorityEnQueue(priorityQueue, new_pos, distances[curr_pos] + heuristic(new_pos % size_X,(int)new_pos / size_Y,cat_loc,cheese_loc,mouse_loc,cats,cheeses,gr));
+		}
+		if(gr[curr_pos][1] == 1 && coordsInArray(curr_pos+1,cat_loc,cats) < 0 && curr_pos+1 < graph_size  && predecessor[curr_pos+1] == -1){
+			int new_pos = curr_pos+1;
+			distances[new_pos] = distances[curr_pos] + 1;
+			predecessor[new_pos] = curr_pos;
+			priorityEnQueue(priorityQueue, new_pos, distances[curr_pos] + heuristic(new_pos % size_X,(int)new_pos / size_Y,cat_loc,cheese_loc,mouse_loc,cats,cheeses,gr));
+		}
+		if(gr[curr_pos][2] == 1 && coordsInArray(curr_pos+size_X,cat_loc,cats) < 0 && curr_pos + size_X < graph_size && predecessor[curr_pos+size_X] == -1){
+			int new_pos = curr_pos+size_X;
+			distances[new_pos] = distances[curr_pos] + 1;
+			predecessor[new_pos] = curr_pos;
+			priorityEnQueue(priorityQueue, new_pos, distances[curr_pos] + heuristic(new_pos % size_X,(int)new_pos / size_Y,cat_loc,cheese_loc,mouse_loc,cats,cheeses,gr));
+		}
+		if(gr[curr_pos][3] == 1 && coordsInArray(curr_pos-1,cat_loc,cats) < 0 && curr_pos -1 >= 0  && predecessor[curr_pos-1] == -1){
+			int new_pos = curr_pos-1;
+			distances[new_pos] = distances[curr_pos] + 1;
+			predecessor[new_pos] = curr_pos;
+			priorityEnQueue(priorityQueue, new_pos, distances[curr_pos] + heuristic(new_pos % size_X,(int)new_pos / size_Y,cat_loc,cheese_loc,mouse_loc,cats,cheeses,gr));
+		}
+
+		iteration++;
+		
+	}
+	//if don't have a cheese index then path wasn't found
+	if (cheese_index < 0){
+		// printf("no cheese found\n");
+		freeQueue(priorityQueue);
+		return -1;
+	}
+	
+	//otherwise need to backtrack the path
+
+	int curr_cords = get_grid_position(cheese_loc[cheese_index]);
+	int path_length = 0;
+	while(curr_cords != mouse_grid){
+		//add the current cords to the path (by operating on its grid value)
+		//then go to its predessecor
+
+		curr_cords = predecessor[curr_cords];
+		path_length++;
+	}
+	//free the queue
+
+	freeQueue(priorityQueue);
+	return path_length;
+
 }
 
 double utility(int cat_loc[10][2], int cheese_loc[10][2], int mouse_loc[1][2], int cats, int cheeses, int depth, double gr[graph_size][4])
@@ -370,23 +598,18 @@ double utility(int cat_loc[10][2], int cheese_loc[10][2], int mouse_loc[1][2], i
 		These arguments are as described in A1. Do have a look at your solution!
  */
 
-	//want to consider depth, num cats, num cheeses, and proximity of all three
-	//low depths are optimal because want shortest solutions
-	//low num cheeses is optimal because want to eat all cheese
-	//low num cats is optimal because that means less cats to chase mouse and no cats means that mouse has won
-	//want high proximity between mouse and cheese, low proximity between (mouse and cat) and (cat and cheese)
 
-	//for now just computing manhattan dist to closest cheese
-	int min_dist = INT_MAX;
-	for(int i = 0; i < cheeses; i++){
-		int newDist = abs(mouse_loc[0][0] - cheese_loc[i][0]) + abs(mouse_loc[0][1] - cheese_loc[i][1]);
-		if(newDist < min_dist){
-			min_dist = newDist;
-		}
-	}
-	return (size_X + size_Y) - min_dist;
+	//WIN CONDITIONS: ALL CATS DEAD OR ALL CHEESE EATEN
+	//LOSE CONDITIONS: MOUSE TRAPPED OR CAT EATS MOUSE
 
- 	//return(1);   // <--- Obviously, this will be replaced by your computer utilities
+	//CAT EATING MOUSE SHOULD BE WORST POSSIBLE SCORE ALONGSIDE TRAPPINg
+	// for(int i = 0; i < cats; i++){
+	// 	if(manhattan_dist(cat_loc[i],mouse_loc[0]) == 0){
+	// 		return -INT_MAX;
+	// 	}
+	// }
+
+	return (size_X * size_Y) - search_length(gr,cat_loc,cats,cheese_loc,cheeses,mouse_loc);
 }
 
 int checkForTerminal(int mouse_loc[1][2],int cat_loc[10][2],int cheese_loc[10][2],int cats,int cheeses)
