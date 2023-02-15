@@ -1,4 +1,14 @@
 current problems with mouse - jumping corners occurs sometimes
 sometimes will legit just vanish into the void
+mouse can teleport around map: ./MiniMax_search 2416 1 2 1 12 1
 
 Think this has something to do with alpha/beta prunning and its effect on the path?
+
+minimax prunning on root node, then just returning alpha
+
+think jumping has to do with evaluations exceeding inital alpha/beta assignments however, this is still inconsistent behaviour between the
+pruning / no pruning executions - don't know what could be causing this
+
+TODO: replace all uses of DBL_MAX with some sort of constant cap (i used 5000)
+    Make utility function continuous? (cat intersection should be mathematical min not an edge case)
+    figure out what's causing odd pruning behaviour
