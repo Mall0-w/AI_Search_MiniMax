@@ -180,6 +180,10 @@ int manhattan_dist(int point1[2], int point2[2]){
 	return abs(point1[0] - point2[0]) + abs(point1[1] - point2[1]);
 }
 
+double euclidean_dist(int point1[2], int point2[2]){
+	return sqrt(pow(point1[0] - point2[0],2) + pow(point1[1] - point2[1],2));
+}
+
 Node* permute_kitties(double gr[graph_size][4], int path[1][2], double minmax_cost[size_X][size_Y], int cat_loc[10][2], int cats, int cheese_loc[10][2], int cheeses, int mouse_loc[1][2], int mode, double (*utility)(int cat_loc[10][2], int cheese_loc[10][2], int mouse_loc[1][2], int cats, int cheeses, int depth, double gr[graph_size][4]), int agentId, int depth, int maxDepth, double alpha, double* beta,
 	int index, Node* scores){
 	if(index == cats){
@@ -627,15 +631,19 @@ double utility(int cat_loc[10][2], int cheese_loc[10][2], int mouse_loc[1][2], i
 
 	//WIN CONDITIONS: ALL CATS DEAD OR ALL CHEESE EATEN
 	//LOSE CONDITIONS: MOUSE TRAPPED OR CAT EATS MOUSE
-
+	int s_length = search_length(gr,cat_loc,cats,cheese_loc,cheeses,mouse_loc);
+	if(s_length == 0) return DBL_MAX;
 	//CAT EATING MOUSE SHOULD BE WORST POSSIBLE SCORE ALONGSIDE TRAPPINg
-	// for(int i = 0; i < cats; i++){
-	// 	if(manhattan_dist(cat_loc[i],mouse_loc[0]) == 0){
-	// 		return -INT_MAX;
-	// 	}
-	// }
+	double cat_dist = 0;
+	for(int i = 0; i < cats; i++){
+		if(manhattan_dist(cat_loc[i],mouse_loc[0]) == 0){
+			return -DBL_MAX;
+		}
+		cat_dist += euclidean_dist(cat_loc[i],mouse_loc[0]);
+	}
 
-	return (size_X * size_Y) - search_length(gr,cat_loc,cats,cheese_loc,cheeses,mouse_loc);
+	return (size_X * size_Y) - s_length - cat_dist;
+
 }
 
 int checkForTerminal(int mouse_loc[1][2],int cat_loc[10][2],int cheese_loc[10][2],int cats,int cheeses)

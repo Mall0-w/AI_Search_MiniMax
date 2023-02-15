@@ -1,0 +1,4 @@
+current problems with mouse - jumping corners occurs sometimes
+sometimes will legit just vanish into the void
+
+Think this has something to do with alpha/beta prunning and its effect on the path?
