@@ -47,11 +47,17 @@ but explain carefully when needed.
 3 .- (1 marks) What situations will cause your mouse to lose?
      can these be fixed either with the utility function, or
      by changing the search depth? if so, how?
-
+          often times my mouse will get trapped by a cat that was out of its vision or
+          it won't properly anticipate the danger a cat poses.  This can be avoided by increasing the search
+          depth or changing the utility function to account for things like the path length from cats to the mouse
+          but at a certain point, it because unpheasable with the amount of computing time.
 
 4 .- (1 marks) Compare cats with smartness=.8 against cats with
      smartness=1 - which are harder for your mouse to beat?
      why do you think that is?
+     Smartness 1 is harder for my mouse to beat since 0.8's randomness can often
+     be exploited by minimax; minimax always assumes optimal play so when 0.8 makes a random move,
+     it just adds moment to the mouse.
 
 5 .- (1 marks) Can the mouse be made unbeatable by having an
      optimal utility function?
@@ -71,12 +77,12 @@ doesn't work, or what problems exist.
 	
 	Complete/Working	Partial		Not done
 
-Utility
+Utility          x
  function
 
-MiniMax
+MiniMax        x
 
-Alpha/Beta
+Alpha/Beta     x
  pruning
 _____________________________________________________
 
