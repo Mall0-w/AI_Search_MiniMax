@@ -598,26 +598,59 @@ double utility(int cat_loc[10][2], int cheese_loc[10][2], int mouse_loc[1][2], i
 
 		These arguments are as described in A1. Do have a look at your solution!
  */
+	/*
+	calculate total cost
+	if mouse will get eaten, then mouse loses return super small values (-CAP)
+	
+	if mouse will eat cheese, mouse wins portion of the game (finding cheese
+		is each an individual game in a sense) - retun highest calue (CAP)
+	
+	searchpath legnth - want to minimize path length, so in tern want to maximize the
 
+	available moves from next position - maybe constant multiplier per available move (10 * number of moves)
+	
+	distance to a cat - want it to exponentially increase based off how close the cat is
+		(distance of 1 >> distance of 2 >>> distance of 3)
+		calculate 10*manhattan dist (since pathing too expensive)
+		ALSO SHOULD IGNORE IT IF DISTANCE IS TOO SMALL
+	
+	depth - want faster paths so maybe have an added cost of -5*depth
+	*/
 
-	//WIN CONDITIONS: ALL CATS DEAD OR ALL CHEESE EATEN
-	//LOSE CONDITIONS: MOUSE TRAPPED OR CAT EATS MOUSE
-	int s_length = search_length(gr,cat_loc,cats,cheese_loc,cheeses,mouse_loc);
-	if(s_length == 0) return CAP;
-	//CAT EATING MOUSE SHOULD BE WORST POSSIBLE SCORE ALONGSIDE TRAPPINg
+	int s_length = (size_X * size_Y) / search_length(gr,cat_loc,cats,cheese_loc,cheeses,mouse_loc);
 	double cat_dist = 0;
-	for(int i = 0; i < cats; i++){
-		if(manhattan_dist(cat_loc[i],mouse_loc[0]) == 0){
-			return -CAP;
+	//if number of cheeses left is 1, can prioritize cheese over staying alive, otherwise prioritize staying alive
+	if(cheeses == 1){
+		if(s_length == 0) return CAP;
+		s_length = s_length * 5;
+		//CAT EATING MOUSE SHOULD BE WORST POSSIBLE SCORE ALONGSIDE TRAPPINg
+		for(int i = 0; i < cats; i++){
+			if(manhattan_dist(cat_loc[i],mouse_loc[0]) == 0){
+				return -CAP;
+			}
+			cat_dist -= (size_X * size_Y)/manhattan_dist(cat_loc[i],mouse_loc[0]);
 		}
-		cat_dist += manhattan_dist(cat_loc[i],mouse_loc[0]);
+	}else{
+		for(int i = 0; i < cats; i++){
+			if(manhattan_dist(cat_loc[i],mouse_loc[0]) == 0){
+				return -CAP;
+			}
+			cat_dist -= (size_X * size_Y)/manhattan_dist(cat_loc[i],mouse_loc[0]);
+		}
+		if(s_length == 0) return CAP;
+	}
+	
+
+	int available_moves = 0;
+	for(int i = 0; i < 4; i++){
+		if(gr[get_grid_position(mouse_loc[0])][i] == 1){
+			available_moves++;
+		}
 	}
 
-	double length = cat_dist - s_length;
-	if(length == 0){
-		//printf("length returning 0, cat_dist: %lf, s_length: %d\n", cat_dist, s_length);
-	}
-	return length;
+	double total = (s_length + cat_dist + (5*available_moves) - (3*depth)) / s_length;
+	
+	return total;
 
 }
 
