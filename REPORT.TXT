@@ -37,6 +37,24 @@ but explain carefully when needed.
      how their influence was evaluated and integrated into
      a single, meaningful value. Convince us that your utility
      makes sense!
+     
+     Currently, My utility function works by considering the length of the shortest path between the mouse
+     and the cheese, how many cheeses remain, the manhattan distance between all the cats and the mouse, the
+     amount of available moves for that mouse, and the depth of the minimax search.
+
+     First off, based off how many cheese are left it will either priortize the cheese or prioritize making sure
+     it is safe from the cats (if there's one cheese left, it much prefers the path, increasing its value and prioritizing
+     the state of eating the cheese over getting eaten since eating all the cheese ends the game)
+     Then from there, it calculates the length of a shortest path from the mouse's position to a cheese, it divides the size
+     of the game board by this number both to put further incentive on getting close to the cheese and because squares become less valuable
+     depending on how big the board is
+     It also calculates the manhattan distance between each cat and the mouse (because shortest path would be too intensive computationally)
+     and sums up the -(size of board / manhattan dist) again to prioritize distance between the mouse and because squares can have different values
+     After that is calcuated it sees how many moves it has from the square and computes 
+     (search length + cat's sum + (5*available_moves) - (3*depth)) / search length
+     this constants are aribitrary and are just meant to put certain priorties towards decreasing depth and increasing the amount
+     of available moves. it then divides all by search length both to keep the sum small, and because we want to esnure the mouse
+     puts emphasis on the cheese and doesn't just spend the entire game running in circles from cats.
 
 2 .- (1 marks) Ignoring computation time, what is the effect of
      search depth (number of turns) on the chances of the mouse
